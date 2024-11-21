@@ -25,6 +25,8 @@ void MainRayGenShader()
 {
     uint2 launchIndex = DispatchRaysIndex().xy;
     uint2 launchDim = DispatchRaysDimensions().xy;
+    uint xorBitValue = (launchIndex.x ^ launchIndex.y) & 0x000000FF;
+    float normalizedXorValue = (float) xorBitValue / 255.0f;
 
     float2 frameCoord = float2(launchIndex.x, launchDim.y - launchIndex.y - 1) + float2(0.5, 0.5);
 
@@ -47,7 +49,7 @@ void MainRayGenShader()
     ray.TMax      = 1000.0f;
 
     RayPayload payload;
-    payload.color = float4(1, 1, 1, 1);
+    payload.color = float4(normalizedXorValue, normalizedXorValue, normalizedXorValue, 1);
 
     uint missShaderIndex = 0;
     TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
