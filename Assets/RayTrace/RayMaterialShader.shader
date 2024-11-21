@@ -95,7 +95,12 @@ Shader "Unlit/RayMaterialShader"
             [shader("closesthit")]
             void ClosestHitMain(inout RayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
             {
-                payload.color = float4(1, 0, 0, 1);
+                float hitT = RayTCurrent();
+                float3 rayDirW = WorldRayDirection();
+                float3 rayOriginW = WorldRayOrigin();
+                float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
+
+                payload.color = float4(barycentrics, 1);
             }
 
             ENDHLSL
