@@ -576,6 +576,7 @@ MonoBehaviour:
   - {fileID: 1726413065}
   - {fileID: 1737475960}
   - {fileID: 392766763}
+  - {fileID: 2135121180}
   rayTracingShader: {fileID: 4807578003741378534, guid: 43ab323ef1e48cf44b6d2f9c9dca1ab6, type: 3}
   output: {fileID: 0}
   image: {fileID: 1568441076}
@@ -1183,7 +1184,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 4ecda3785baed3f4681435032978f32e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
