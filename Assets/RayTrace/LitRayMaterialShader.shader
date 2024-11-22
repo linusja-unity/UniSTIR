@@ -1,4 +1,4 @@
-Shader "Universal Render Pipeline/Lit"
+Shader "URP-RayTray/Lit"
 {
     Properties
     {
