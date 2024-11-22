@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
 
-public class dxr_script : MonoBehaviour
+public class RayScript : MonoBehaviour
 {
     RayTracingAccelerationStructure accelerationStructure;
     RayTracingAccelerationStructure.Settings settings;
