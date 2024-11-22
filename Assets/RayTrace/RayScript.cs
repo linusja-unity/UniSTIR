@@ -37,7 +37,6 @@ public class dxr_script : MonoBehaviour
             accelerationStructure.AddInstance(r, subMeshFlags);
         }
         accelerationStructure.Build();
-        Debug.Log(accelerationStructure.GetSize());
 
         rayTracingShader.SetAccelerationStructure("g_SceneAccelStruct", accelerationStructure);
         rayTracingShader.SetFloat("g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
