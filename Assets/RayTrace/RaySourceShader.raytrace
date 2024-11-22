@@ -1,4 +1,5 @@
 #include "UnityShaderVariables.cginc"
+#include "RayCommon.raytrace"
 
 #pragma max_recursion_depth 1
 
@@ -8,11 +9,6 @@ float g_Zoom; //Mathf.Tan(Mathf.Deg2Rad * Camera.main.fieldOfView * 0.5f)
 
 // Output
 RWTexture2D<float4> g_Output;
-
-struct RayPayload
-{
-    float4 color;
-};
 
 [shader("miss")]
 void MainMissShader(inout RayPayload payload : SV_RayPayload)

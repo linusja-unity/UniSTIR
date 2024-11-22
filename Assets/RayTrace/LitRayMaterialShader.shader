@@ -535,36 +535,7 @@ Shader "Universal Render Pipeline/Lit"
             // Specify this shader is a raytracing shader.
             #pragma raytracing test
 
-            struct AttributeData
-            {
-                float2 barycentrics;
-            };
-
-            struct RayPayload
-            {
-                float4 color;
-            };
-
-    #if RAY_TRACING_PROCEDURAL_GEOMETRY
-            [shader("intersection")]
-            void IntersectionMain()
-            {
-                AttributeData attr;
-                attr.barycentrics = float2(0, 0);
-                ReportHit(0, 0, attr);
-            }
-    #endif
-
-            [shader("closesthit")]
-            void ClosestHitMain(inout RayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
-            {
-                float hitT = RayTCurrent();
-                float3 rayDirW = WorldRayDirection();
-                float3 rayOriginW = WorldRayOrigin();
-                float3 barycentrics = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
-
-                payload.color = float4(barycentrics, 1);
-            }
+            #include "RayMaterialShaders.raytrace"
 
             ENDHLSL
         }
