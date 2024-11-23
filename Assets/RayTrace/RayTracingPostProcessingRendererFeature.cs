@@ -76,7 +76,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         accelerationStructure.Build();
 
         rayTracingShader.SetAccelerationStructure("g_SceneAccelStruct", accelerationStructure);
-        rayTracingShader.SetShaderPass("Test");
+        rayTracingShader.SetShaderPass("RayTracingPass");
     }
 
     public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
