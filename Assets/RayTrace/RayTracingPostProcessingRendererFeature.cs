@@ -10,8 +10,6 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 {
     [SerializeField] private RayTracingShader rayTracingShader;
 
-    [SerializeField] private RenderTexture output;
-
     private RayTracingPostProcessingRenderPass rayTracingRenderPass;
 
     public override void Create()
@@ -36,7 +34,6 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
         if (renderingData.cameraData.cameraType == CameraType.Game)
         {
             renderer.EnqueuePass(rayTracingRenderPass);
-            output = rayTracingRenderPass.output;
         }
     }
 
@@ -54,7 +51,9 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
 
     private Renderer[] renderers;
 
-    public RenderTexture output;
+    private RenderTexture output;
+
+    private Vector2Int currDims = new Vector2Int(0, 0);
 
     public RayTracingPostProcessingRenderPass(RayTracingShader rayTracingShader)
     {
@@ -79,25 +78,33 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         rayTracingShader.SetShaderPass("RayTracingPass");
     }
 
+    public override void OnCameraCleanup(CommandBuffer cmd)
+    {
+        cmd.Blit(output, Display.main.colorBuffer);
+    }
+
     public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
     {
         UniversalResourceData resourceData = frameData.Get<UniversalResourceData>();
         UniversalCameraData cameraData = frameData.Get<UniversalCameraData>();
 
+        // The following line ensures that the render pass doesn't blit
+        // from the back buffer.
+        if (resourceData.isActiveTargetBackBuffer)
+            return;
+
         Camera c = cameraData.camera;
-        if (!output) {
+        Vector2Int trgtDims = new Vector2Int(c.pixelHeight, c.pixelWidth);
+        if (currDims != trgtDims) {
             output = new RenderTexture(c.pixelWidth, c.pixelHeight, 0);
             output.enableRandomWrite = true;
             output.Create();
 
             rayTracingShader.SetFloat("g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
             rayTracingShader.SetTexture("g_Output", output);
-        }
 
-        // The following line ensures that the render pass doesn't blit
-        // from the back buffer.
-        if (resourceData.isActiveTargetBackBuffer)
-            return;
+            currDims = trgtDims;
+        }
 
         foreach (var r in renderers)
         {
