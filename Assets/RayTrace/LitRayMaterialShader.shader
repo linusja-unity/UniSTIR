@@ -523,7 +523,7 @@ Shader "URP-RayTray/Lit"
         Pass
         {
             // RayTracingShader.SetShaderPass must use this name in order to execute the ray tracing shaders from this Pass.
-            Name "Test"
+            Name "RayTracingPass"
 
             // Add tags to identify the shaders to use for ray tracing.
             Tags{ "LightMode" = "RayTracing" }
