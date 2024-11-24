@@ -5,6 +5,7 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.RenderGraphModule.Util;
+using GraphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat;
 
 public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 {
@@ -20,7 +21,7 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
         }
         rayTracingRenderPass = new RayTracingPostProcessingRenderPass(rayTracingShader);
 
-        rayTracingRenderPass.renderPassEvent = RenderPassEvent.AfterRenderingGbuffer;
+        rayTracingRenderPass.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer,
@@ -51,9 +52,10 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
 
     private Renderer[] renderers;
 
-    private RenderTexture output;
-
     private Vector2Int currDims = new Vector2Int(0, 0);
+
+    private RTHandleSystem renderTexHandleSystem = new RTHandleSystem();
+    private RTHandle renderTexHandle;
 
     public RayTracingPostProcessingRenderPass(RayTracingShader rayTracingShader)
     {
@@ -74,13 +76,33 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         }
         accelerationStructure.Build();
 
-        rayTracingShader.SetAccelerationStructure("g_SceneAccelStruct", accelerationStructure);
-        rayTracingShader.SetShaderPass("RayTracingPass");
+        renderTexHandleSystem.Initialize(1, 1);
     }
 
-    public override void OnCameraCleanup(CommandBuffer cmd)
+    private class PassData {
+        // Inputs
+        internal Camera camera;
+        internal RayTracingAccelerationStructure accelerationStructure;
+        internal RayTracingShader rayTracingShader;
+        internal TextureHandle albedoTexture;
+
+        // Output
+        internal TextureHandle outputBuffer;
+    }
+
+    static void ComputePass(PassData data, ComputeGraphContext context)
     {
-        cmd.Blit(output, Display.main.colorBuffer);
+        Camera c = data.camera;
+        RayTracingShader rayTracingShader = data.rayTracingShader;
+        ComputeCommandBuffer cmd = context.cmd;
+
+        cmd.BuildRayTracingAccelerationStructure(data.accelerationStructure);
+
+        cmd.SetRayTracingAccelerationStructure(rayTracingShader, "g_SceneAccelStruct", data.accelerationStructure);
+        cmd.SetRayTracingFloatParam(rayTracingShader, "g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
+        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Output", data.outputBuffer);
+
+        cmd.DispatchRays(rayTracingShader, "MainRayGenShader", (uint) c.pixelWidth, (uint) c.pixelHeight, 1, c);
     }
 
     public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -96,15 +118,15 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         Camera c = cameraData.camera;
         Vector2Int trgtDims = new Vector2Int(c.pixelHeight, c.pixelWidth);
         if (currDims != trgtDims) {
-            output = new RenderTexture(c.pixelWidth, c.pixelHeight, 0);
-            output.enableRandomWrite = true;
-            output.Create();
 
-            rayTracingShader.SetFloat("g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
-            rayTracingShader.SetTexture("g_Output", output);
-
+            renderTexHandleSystem.SetReferenceSize(c.pixelWidth, c.pixelHeight, true);
+            renderTexHandle = renderTexHandleSystem.Alloc(c.pixelWidth, c.pixelHeight,
+                colorFormat: GraphicsFormat.R8G8B8A8_UNorm, enableRandomWrite: true, name: "RTRT_Output");
             currDims = trgtDims;
         }
+
+        if (renderTexHandle == null)
+            return;
 
         foreach (var r in renderers)
         {
@@ -112,7 +134,27 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         }
         accelerationStructure.Build();
 
-        if (c.isActiveAndEnabled)
-            rayTracingShader.Dispatch("MainRayGenShader", c.pixelWidth, c.pixelHeight, 1, c);
+        RenderTextureDescriptor desc = cameraData.cameraTargetDescriptor;
+        desc.msaaSamples = 1;
+        desc.depthBufferBits = 0;
+
+        TextureHandle output = renderGraph.ImportTexture(renderTexHandle);
+        using (var builder = renderGraph.AddComputePass(passName, out PassData data))
+        {
+            data.camera = c;
+            data.rayTracingShader = rayTracingShader;
+            data.accelerationStructure = accelerationStructure;
+            data.albedoTexture = resourceData.gBuffer[0];
+            builder.UseTexture(data.albedoTexture, AccessFlags.Read);
+
+            data.outputBuffer = output;
+            builder.UseTexture(data.outputBuffer, AccessFlags.ReadWrite);
+
+            builder.AllowPassCulling(false);
+
+            builder.SetRenderFunc((PassData _data, ComputeGraphContext context) => ComputePass(_data, context));
+        }
+
+        renderGraph.AddCopyPass(output, resourceData.activeColorTexture);
     }
 }
