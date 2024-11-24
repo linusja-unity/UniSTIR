@@ -5,10 +5,14 @@
 
 // Input
 RaytracingAccelerationStructure g_SceneAccelStruct;
+Texture2D<float4> g_Albedo;
+Texture2D<float4> g_Normal;
+Texture2D<float4> g_Depths;
+Texture2D<float4> g_Motion;
 float g_Zoom; //Mathf.Tan(Mathf.Deg2Rad * Camera.main.fieldOfView * 0.5f)
 
 // Output
-RWTexture2D<float4> g_Output;
+RWTexture2D<float4> g_Output : register(u0);
 
 [shader("miss")]
 void MainMissShader(inout RayPayload payload : SV_RayPayload)
@@ -30,6 +34,18 @@ void MainRayGenShader()
 
     ndcCoords = ndcCoords * 2 - float2(1, 1);
     ndcCoords = ndcCoords * g_Zoom;
+
+    if (ndcCoords.x < 0) {
+        if (ndcCoords.y < -0.25)
+            g_Output[frameCoord] = g_Albedo[frameCoord];
+        else if (ndcCoords.y < 0)
+            g_Output[frameCoord] = normalize(g_Normal[frameCoord] * 0.5 + 0.5);
+        else if (ndcCoords.y < 0.25)
+            g_Output[frameCoord] = float4(g_Depths[frameCoord].xxx, 1.0);
+        else
+            g_Output[frameCoord] = float4(g_Motion[frameCoord].xy, 0.0, 1.0);
+        return;
+    }
 
     float aspectRatio = (float)launchDim.x / (float)launchDim.y;
 
