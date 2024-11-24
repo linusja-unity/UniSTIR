@@ -34,6 +34,10 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 
         if (renderingData.cameraData.cameraType == CameraType.Game)
         {
+            rayTracingRenderPass.ConfigureInput(ScriptableRenderPassInput.Color |
+                                                ScriptableRenderPassInput.Normal |
+                                                ScriptableRenderPassInput.Depth |
+                                                ScriptableRenderPassInput.Motion);
             renderer.EnqueuePass(rayTracingRenderPass);
         }
     }
@@ -85,6 +89,9 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         internal RayTracingAccelerationStructure accelerationStructure;
         internal RayTracingShader rayTracingShader;
         internal TextureHandle albedoTexture;
+        internal TextureHandle normalTexture;
+        internal TextureHandle depthsTexture;
+        internal TextureHandle motionTexture;
 
         // Output
         internal TextureHandle outputBuffer;
@@ -99,7 +106,12 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         cmd.BuildRayTracingAccelerationStructure(data.accelerationStructure);
 
         cmd.SetRayTracingAccelerationStructure(rayTracingShader, "g_SceneAccelStruct", data.accelerationStructure);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Albedo", data.albedoTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Normal", data.normalTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Depths", data.depthsTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Motion", data.motionTexture);
         cmd.SetRayTracingFloatParam(rayTracingShader, "g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
+
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Output", data.outputBuffer);
 
         cmd.DispatchRays(rayTracingShader, "MainRayGenShader", (uint) c.pixelWidth, (uint) c.pixelHeight, 1, c);
@@ -145,7 +157,13 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
             data.rayTracingShader = rayTracingShader;
             data.accelerationStructure = accelerationStructure;
             data.albedoTexture = resourceData.gBuffer[0];
-            builder.UseTexture(data.albedoTexture, AccessFlags.Read);
+            data.normalTexture = resourceData.cameraNormalsTexture;
+            data.depthsTexture  = resourceData.cameraDepthTexture;
+            data.motionTexture = resourceData.motionVectorColor;
+            builder.UseTexture(data.albedoTexture);
+            builder.UseTexture(data.normalTexture);
+            builder.UseTexture(data.depthsTexture);
+            builder.UseTexture(data.motionTexture);
 
             data.outputBuffer = output;
             builder.UseTexture(data.outputBuffer, AccessFlags.ReadWrite);
