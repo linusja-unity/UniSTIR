@@ -1,0 +1,6 @@
+#include "UnityShaderVariables.cginc"
+
+struct RayPayload
+{
+    float4 color;
+};
