@@ -1,10 +1,8 @@
-using System;
-using UnityEditor;
 using UnityEngine;
-using UnityEngine.Rendering.Universal;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RenderGraphModule;
 using UnityEngine.Rendering.RenderGraphModule.Util;
+using UnityEngine.Rendering.Universal;
 using GraphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat;
 
 public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
@@ -81,9 +79,13 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         accelerationStructure.Build();
 
         renderTexHandleSystem.Initialize(1, 1);
+
+        // This is set so the shader knows what shader code to use using the subpass
+        rayTracingShader.SetShaderPass("RayTracingPass");
     }
 
-    private class PassData {
+    private class PassData
+    {
         // Inputs
         internal Camera camera;
         internal RayTracingAccelerationStructure accelerationStructure;
@@ -114,7 +116,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
 
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Output", data.outputBuffer);
 
-        cmd.DispatchRays(rayTracingShader, "MainRayGenShader", (uint) c.pixelWidth, (uint) c.pixelHeight, 1, c);
+        cmd.DispatchRays(rayTracingShader, "MainRayGenShader", (uint)c.pixelWidth, (uint)c.pixelHeight, 1, c);
     }
 
     public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -129,7 +131,8 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
 
         Camera c = cameraData.camera;
         Vector2Int trgtDims = new Vector2Int(c.pixelHeight, c.pixelWidth);
-        if (currDims != trgtDims) {
+        if (currDims != trgtDims)
+        {
 
             renderTexHandleSystem.SetReferenceSize(c.pixelWidth, c.pixelHeight, true);
             renderTexHandle = renderTexHandleSystem.Alloc(c.pixelWidth, c.pixelHeight,
@@ -158,7 +161,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
             data.accelerationStructure = accelerationStructure;
             data.albedoTexture = resourceData.gBuffer[0];
             data.normalTexture = resourceData.cameraNormalsTexture;
-            data.depthsTexture  = resourceData.cameraDepthTexture;
+            data.depthsTexture = resourceData.cameraDepthTexture;
             data.motionTexture = resourceData.motionVectorColor;
             builder.UseTexture(data.albedoTexture);
             builder.UseTexture(data.normalTexture);
