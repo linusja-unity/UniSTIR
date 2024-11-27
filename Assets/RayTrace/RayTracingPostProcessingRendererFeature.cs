@@ -105,6 +105,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         RayTracingShader rayTracingShader = data.rayTracingShader;
         ComputeCommandBuffer cmd = context.cmd;
 
+        rayTracingShader.SetShaderPass("RayTracingPass");
         cmd.BuildRayTracingAccelerationStructure(data.accelerationStructure);
 
         cmd.SetRayTracingAccelerationStructure(rayTracingShader, "g_SceneAccelStruct", data.accelerationStructure);
