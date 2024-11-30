@@ -3,4 +3,6 @@
 struct RayPayload
 {
     float4 color;
+    float3 worldPos;
+    float3 normal;
 };
