@@ -9,15 +9,17 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 {
     [SerializeField] private RayTracingShader rayTracingShader;
 
+    [SerializeField] private Material defaultRayTracingMaterial;
+
     private RayTracingPostProcessingRenderPass rayTracingRenderPass;
 
     public override void Create()
     {
-        if (rayTracingShader == null)
+        if (rayTracingShader == null || defaultRayTracingMaterial == null)
         {
             return;
         }
-        rayTracingRenderPass = new RayTracingPostProcessingRenderPass(rayTracingShader);
+        rayTracingRenderPass = new RayTracingPostProcessingRenderPass(rayTracingShader, defaultRayTracingMaterial);
 
         rayTracingRenderPass.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
     }
@@ -59,7 +61,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
     private RTHandleSystem renderTexHandleSystem = new RTHandleSystem();
     private RTHandle renderTexHandle;
 
-    public RayTracingPostProcessingRenderPass(RayTracingShader rayTracingShader)
+    public RayTracingPostProcessingRenderPass(RayTracingShader rayTracingShader, Material defaultRayTracingMaterial)
     {
         this.rayTracingShader = rayTracingShader;
 
@@ -75,6 +77,8 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         foreach (var r in renderers)
         {
             accelerationStructure.AddInstance(r, subMeshFlags);
+            if (r.sharedMaterial == null || r.sharedMaterial.shader != defaultRayTracingMaterial.shader)
+                r.sharedMaterial = defaultRayTracingMaterial;
         }
         accelerationStructure.Build();
 

@@ -65,8 +65,5 @@ MonoBehaviour:
   m_Name: RayTracingPostProcessingRendererFeature
   m_EditorClassIdentifier: 
   m_Active: 1
-  settings:
-    horizontalBlur: 0
-    verticalBlur: 0
   rayTracingShader: {fileID: 4807578003741378534, guid: 43ab323ef1e48cf44b6d2f9c9dca1ab6, type: 3}
-  output: {fileID: 0}
+  defaultRayTracingMaterial: {fileID: 2100000, guid: 4ecda3785baed3f4681435032978f32e, type: 2}
