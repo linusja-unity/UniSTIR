@@ -1,8 +1,13 @@
+#ifndef __RAY_COMMON_RAYTRACE__
+#define __RAY_COMMON_RAYTRACE__
+
 #include "UnityShaderVariables.cginc"
 
 struct RayPayload
 {
     float4 color;
-    float3 worldPos;
+    float3 worldPosition;
     float3 normal;
 };
+
+#endif // __RAY_COMMON_RAYTRACE__

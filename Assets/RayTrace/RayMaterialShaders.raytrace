@@ -44,12 +44,13 @@ Vertex InterpolateVertices(Vertex v0, Vertex v1, Vertex v2, float3 barycentrics)
 }
 
 [shader("closesthit")]
-void ClosestHitMain(inout RayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
+void ClosestHitMain(inout RayPayload payload, AttributeData attribs : SV_IntersectionAttributes)
 {
     float hitT = RayTCurrent();
     float3 rayDirW = WorldRayDirection();
     float3 rayOriginW = WorldRayOrigin();
     uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
+    float3 toLightDir = normalize(_WorldSpaceLightPos0.xyz);
 
     Vertex v0, v1, v2;
     v0 = FetchVertex(triangleIndices.x);
@@ -62,10 +63,7 @@ void ClosestHitMain(inout RayPayload payload : SV_RayPayload, AttributeData attr
     float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1));
     float3 faceNormal = normalize(mul(v.normal, (float3x3)WorldToObject()));
 
-    float3 toLightDir = normalize(_WorldSpaceLightPos0);
-    float shadow = max(dot(normalize(v.normal), toLightDir), 0.0);
-    payload.color = float4(shadow, shadow, shadow, 1.0f);
-
-    payload.worldPos = worldPosition;
+    payload.color *= dot(toLightDir, faceNormal);
+    payload.worldPosition = worldPosition;
     payload.normal = faceNormal;
 }

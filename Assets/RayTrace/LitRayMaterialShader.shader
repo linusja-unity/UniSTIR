@@ -535,6 +535,7 @@ Shader "URP-RayTray/Lit"
             // Specify this shader is a raytracing shader.
             #pragma raytracing test
 
+            #include "RayCommon.raytrace"
             #include "RayMaterialShaders.raytrace"
 
             ENDHLSL
