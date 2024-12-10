@@ -603,6 +603,7 @@ Shader "URP-RayTray/Lit"
                 payload.albedo = float4(barycentricCoords, 1.0);
                 payload.worldPosition = worldPosition;
                 payload.worldNormal = faceNormal;
+                payload.worldReflection = reflect(rayDirW, faceNormal); /* Todo: Describe micro facets */
             }
 
             ENDHLSL

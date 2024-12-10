@@ -18,12 +18,12 @@ RWTexture2D<float4> g_Output : register(u0);
 float3 SampleEnvironmentMapColour(float3 direction)
 {
     float3 toLightDir = normalize(_WorldSpaceLightPos0.xyz);
-    return dot(direction, toLightDir) > 0.999 ? 1.0 : 0.0;
+    return dot(direction, toLightDir) > 0.999 ? 1.0 : float3(0.5, 0.8, 0.9);
 }
 
 float3 SampleEnvironmentMapRadience(float3 direction)
 {
-    return SampleEnvironmentMapColour(direction) * 10.0;
+    return SampleEnvironmentMapColour(direction);
 }
 
 [shader("miss")]
@@ -32,10 +32,11 @@ void MainMissShader(inout RayPayload payload)
     float3 rayDirW = normalize(WorldRayDirection());
     float3 rayOriginW = WorldRayOrigin();
 
-    payload.worldPosition = rayDirW * 1000.0f;
-    payload.albedo = SampleEnvironmentMapColour(rayDirW);
     payload.radiance = SampleEnvironmentMapRadience(rayDirW);
+    payload.albedo = SampleEnvironmentMapColour(rayDirW);
+    payload.worldPosition = rayDirW * 1000.0f;
     payload.worldNormal = 0.0;
+    payload.worldReflection = 0.0;
 }
 
 [shader("raygeneration")]
@@ -75,62 +76,59 @@ void MainRayGenShader()
         firstBounceAlbedo = SampleEnvironmentMapColour(-toCameraDir);
     }
 
-    float3 radiance = firstBounceRadiance;
-    float3 colour = 1.0f * firstBounceAlbedo; /* First founce colour */
-
-    RayDesc ray;
-    RayPayload reflectRayPayload;
-    RayPayload lightRayPayload;
     uint missShaderIndex = 0;
 
-    reflectRayPayload.worldPosition = adjustedWorldPosition;
-    reflectRayPayload.worldNormal = worldNormal;
-    float3 intersectIncidentVector = normalize(reflect(-toCameraDir, reflectRayPayload.worldNormal));
+    // Describ the condition of the first bounce data by sampling rasterisation gbuffer
+    RayPayload currPoint;
+    currPoint.albedo = 1.0f * firstBounceAlbedo;
+    currPoint.radiance = firstBounceRadiance;
+    currPoint.worldPosition = adjustedWorldPosition;
+    currPoint.worldNormal = worldNormal;
+    currPoint.worldReflection = normalize(reflect(-toCameraDir, worldNormal));
+
+    // Integration strategically happens in raygen shader
+    float3 integratedRadiance = currPoint.radiance;
+    float3 integratedColour = 1;
 
     // If we hit the skybox, stop sampling
-    for (uint i = 0; i < 5 && length(reflectRayPayload.worldNormal) > 1e-6; i++)
+    for (uint i = 0; i < 5 && length(currPoint.worldNormal) > 1e-6; i++)
     {
-        float3 intersectWorldPosition = reflectRayPayload.worldPosition;
-        float3 intersectWorldNormal = reflectRayPayload.worldNormal;
+        RayDesc newRayDesc;
+        newRayDesc.TMin      = 0.0f;
+        newRayDesc.TMax      = 1000.0f;
 
-        float weightShadow = max(dot(toLightDir, intersectWorldNormal), 0.0);
-        float weightReflect = max(dot(intersectIncidentVector, intersectWorldNormal), 0.0);
-        float weightSum = weightShadow + weightReflect;
+        RayPayload primaryRay, lightRay;
 
-        // Always set the input data for the light ray and the reflection ray the same
-        lightRayPayload = reflectRayPayload;
+        // Always set the input data be the previous rays output data
+        primaryRay = lightRay = currPoint;
 
-        ray.Origin    = intersectWorldPosition + intersectWorldNormal * 1e-4;
-        ray.Direction = toLightDir;
-        ray.TMin      = 0.0f;
-        ray.TMax      = 1000.0f;
+        // Light ray
+        newRayDesc.Origin    = currPoint.worldPosition + currPoint.worldNormal * 1e-4;
+        newRayDesc.Direction = toLightDir;
+        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, lightRay);
 
-        // Shadow ray
-        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, lightRayPayload);
+        // Primary ray
+        newRayDesc.Origin    = currPoint.worldPosition + currPoint.worldNormal * 1e-4;
+        newRayDesc.Direction = currPoint.worldReflection;
+        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, primaryRay);
 
-        radiance += colour * lightRayPayload.radiance * weightShadow / 10.0;
+        float probLightWeight = max(dot(toLightDir, currPoint.worldNormal), 0.0);
+        //integratedRadiance += integratedColour * currPoint.albedo * lightRay.radiance * probLightWeight;
 
-        ray.Origin    = intersectWorldPosition + intersectIncidentVector * 1e-4;
-        ray.Direction = intersectIncidentVector;
-        ray.TMin      = 0.0f;
-        ray.TMax      = 1000.0f;
+        float probPrimWeight = max(dot(currPoint.worldReflection, currPoint.worldNormal), 0.0);
+        //integratedRadiance += (integratedColour * currPoint.albedo) * primaryRay.radiance * probPrimWeight;
 
-        // Reflection ray
-        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, reflectRayPayload);
+        integratedRadiance += (integratedColour * currPoint.albedo) * lerp(lightRay.radiance * probLightWeight,
+                                                                           primaryRay.radiance * probPrimWeight, 0.5);
 
-        float3 incomingLightReflect = reflectRayPayload.albedo * reflectRayPayload.radiance * weightReflect;
-        float3 incomingLightSkymap = lightRayPayload.albedo * lightRayPayload.radiance * weightShadow / 10.0;
-
-        radiance += colour * lerp(incomingLightReflect, incomingLightSkymap, 0.5);
-
-        colour *= reflectRayPayload.albedo;
-
-        if (length(colour) < 0.01)
+        // If we reflect into void or if accumulate bounces are miniscule
+        if (length(integratedColour) < 1e-6 || length(primaryRay.worldReflection) < 1e-6)
             break;
 
-        // v_out = reflect(v_in, v_norm);
-        intersectIncidentVector = reflect(intersectIncidentVector, reflectRayPayload.worldNormal);
+        // Since we continue to bounce, follow the primary ray
+        integratedColour *= primaryRay.albedo;
+        currPoint = primaryRay;
     }
 
-    g_Output[frameCoord] = float4(radiance, 1.0);
+    g_Output[frameCoord] = float4(integratedRadiance, 1.0);
 }
