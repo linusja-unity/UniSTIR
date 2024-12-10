@@ -1,6 +1,6 @@
 #include "UnityShaderVariables.cginc"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
-#include "RayCommon.raytrace"
+#include "RayCommon.hlsl"
 
 #pragma max_recursion_depth 1
 
@@ -11,6 +11,8 @@ Texture2D<float4> g_Normal;
 Texture2D<float4> g_Depths;
 Texture2D<float4> g_Motion;
 float g_Zoom; //Mathf.Tan(Mathf.Deg2Rad * Camera.main.fieldOfView * 0.5f)
+uint g_ConvergenceStep;
+uint g_FrameIndex;
 
 // Output
 RWTexture2D<float4> g_Output : register(u0);
@@ -57,8 +59,9 @@ void MainRayGenShader()
     ndcCoords = ndcCoords * g_Zoom;
 
     float aspectRatio = (float)launchDim.x / (float)launchDim.y;
-
     float3 viewDirection = normalize(float3(ndcCoords.x * aspectRatio, ndcCoords.y, 1));
+
+    uint rngState = uint(uint(launchIndex.x) * uint(1973) + uint(launchIndex.y) * uint(9277) + uint(g_ConvergenceStep + g_FrameIndex) * uint(26699)) | uint(1);
 
     // Rotate the ray from view space to world space.
     float3 toCameraDir = -normalize(mul((float3x3)unity_CameraToWorld, viewDirection));
@@ -80,6 +83,7 @@ void MainRayGenShader()
 
     // Describ the condition of the first bounce data by sampling rasterisation gbuffer
     RayPayload currPoint;
+    currPoint.rngState = rngState;
     currPoint.albedo = 1.0f * firstBounceAlbedo;
     currPoint.radiance = firstBounceRadiance;
     currPoint.worldPosition = adjustedWorldPosition;
@@ -113,10 +117,8 @@ void MainRayGenShader()
         TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, primaryRay);
 
         float probLightWeight = max(dot(toLightDir, currPoint.worldNormal), 0.0);
-        //integratedRadiance += integratedColour * currPoint.albedo * lightRay.radiance * probLightWeight;
-
         float probPrimWeight = max(dot(currPoint.worldReflection, currPoint.worldNormal), 0.0);
-        //integratedRadiance += (integratedColour * currPoint.albedo) * primaryRay.radiance * probPrimWeight;
+
 
         integratedRadiance += (integratedColour * currPoint.albedo) * lerp(lightRay.radiance * probLightWeight,
                                                                            primaryRay.radiance * probPrimWeight, 0.5);

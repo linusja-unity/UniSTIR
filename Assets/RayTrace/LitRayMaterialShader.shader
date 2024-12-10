@@ -537,7 +537,7 @@ Shader "URP-RayTray/Lit"
 
             #include "UnityShaderVariables.cginc"
             #include "UnityRaytracingMeshUtils.cginc"
-            #include "RayCommon.raytrace"
+            #include "RayCommon.hlsl"
 
             float4 _BaseColor;
 
@@ -605,7 +605,7 @@ Shader "URP-RayTray/Lit"
                 payload.albedo = _BaseColor;
                 payload.worldPosition = worldPosition;
                 payload.worldNormal = faceNormal;
-                payload.worldReflection = reflect(rayDirW, faceNormal); /* Todo: Describe micro facets */
+                payload.worldReflection = RandomUnitHemisphereVector(payload.rngState, faceNormal);
             }
 
             ENDHLSL

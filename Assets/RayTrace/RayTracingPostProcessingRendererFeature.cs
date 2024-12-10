@@ -118,6 +118,8 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Depths", data.depthsTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Motion", data.motionTexture);
         cmd.SetRayTracingFloatParam(rayTracingShader, "g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
+        cmd.SetRayTracingIntParam(rayTracingShader, "g_ConvergenceStep", 0);
+        cmd.SetRayTracingIntParam(rayTracingShader, "g_FrameIndex", Time.frameCount);
 
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Output", data.outputBuffer);
 
