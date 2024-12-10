@@ -535,8 +535,75 @@ Shader "URP-RayTray/Lit"
             // Specify this shader is a raytracing shader.
             #pragma raytracing test
 
+            #include "UnityShaderVariables.cginc"
+            #include "UnityRaytracingMeshUtils.cginc"
             #include "RayCommon.raytrace"
-            #include "RayMaterialShaders.raytrace"
+
+            struct AttributeData
+            {
+                float2 barycentrics;
+            };
+
+            struct Vertex
+            {
+                float3 position;
+                float3 normal;
+                float2 uv;
+            };
+
+            #if RAY_TRACING_PROCEDURAL_GEOMETRY
+            [shader("intersection")]
+            void IntersectionMain()
+            {
+                AttributeData attr;
+                attr.barycentrics = float2(0, 0);
+                ReportHit(0, 0, attr);
+            }
+            #endif
+
+            Vertex FetchVertex(uint vertexIndex)
+            {
+                Vertex v;
+                v.position = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributePosition);
+                v.normal = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeNormal);
+                v.uv = UnityRayTracingFetchVertexAttribute2(vertexIndex, kVertexAttributeTexCoord0);
+                return v;
+            }
+
+            Vertex InterpolateVertices(Vertex v0, Vertex v1, Vertex v2, float3 barycentrics)
+            {
+                Vertex v;
+                #define INTERPOLATE_ATTRIBUTE(attr) v.attr = v0.attr * barycentrics.x + v1.attr * barycentrics.y + v2.attr * barycentrics.z
+                INTERPOLATE_ATTRIBUTE(position);
+                INTERPOLATE_ATTRIBUTE(normal);
+                INTERPOLATE_ATTRIBUTE(uv);
+                return v;
+            }
+
+            [shader("closesthit")]
+            void ClosestHitMain(inout RayPayload payload, AttributeData attribs : SV_IntersectionAttributes)
+            {
+                float hitT = RayTCurrent();
+                float3 rayDirW = WorldRayDirection();
+                float3 rayOriginW = WorldRayOrigin();
+                uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
+
+                Vertex v0, v1, v2;
+                v0 = FetchVertex(triangleIndices.x);
+                v1 = FetchVertex(triangleIndices.y);
+                v2 = FetchVertex(triangleIndices.z);
+
+                float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
+                Vertex v = InterpolateVertices(v0, v1, v2, barycentricCoords);
+
+                float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1));
+                float3 faceNormal = normalize(mul(v.normal, (float3x3)WorldToObject()));
+
+                payload.color *= 0.0f;
+                payload.worldPosition = worldPosition;
+                payload.normal = faceNormal;
+            }
+
 
             ENDHLSL
         }
