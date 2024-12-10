@@ -584,7 +584,7 @@ Shader "URP-RayTray/Lit"
             void ClosestHitMain(inout RayPayload payload, AttributeData attribs : SV_IntersectionAttributes)
             {
                 float hitT = RayTCurrent();
-                float3 rayDirW = WorldRayDirection();
+                float3 rayDirW = normalize(WorldRayDirection());
                 float3 rayOriginW = WorldRayOrigin();
                 uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(PrimitiveIndex());
 
@@ -599,11 +599,10 @@ Shader "URP-RayTray/Lit"
                 float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1));
                 float3 faceNormal = normalize(mul(v.normal, (float3x3)WorldToObject()));
 
-                payload.color *= 0.0f;
+                payload.color = float4(barycentricCoords, 1.0);
                 payload.worldPosition = worldPosition;
                 payload.normal = faceNormal;
             }
-
 
             ENDHLSL
         }
