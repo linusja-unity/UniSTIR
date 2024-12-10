@@ -539,6 +539,8 @@ Shader "URP-RayTray/Lit"
             #include "UnityRaytracingMeshUtils.cginc"
             #include "RayCommon.raytrace"
 
+            float4 _BaseColor;
+
             struct AttributeData
             {
                 float2 barycentrics;
@@ -600,7 +602,7 @@ Shader "URP-RayTray/Lit"
                 float3 faceNormal = normalize(mul(v.normal, (float3x3)WorldToObject()));
 
                 payload.radiance = 0.0;
-                payload.albedo = float4(barycentricCoords, 1.0);
+                payload.albedo = _BaseColor;
                 payload.worldPosition = worldPosition;
                 payload.worldNormal = faceNormal;
                 payload.worldReflection = reflect(rayDirW, faceNormal); /* Todo: Describe micro facets */
