@@ -5,9 +5,11 @@
 
 struct RayPayload
 {
-    float4 color;
+    // Output
+    float3 albedo;
+    float3 radiance;
     float3 worldPosition;
-    float3 normal;
+    float3 worldNormal;
 };
 
 #endif // __RAY_COMMON_RAYTRACE__

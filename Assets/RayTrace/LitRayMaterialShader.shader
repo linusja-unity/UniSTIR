@@ -599,9 +599,10 @@ Shader "URP-RayTray/Lit"
                 float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1));
                 float3 faceNormal = normalize(mul(v.normal, (float3x3)WorldToObject()));
 
-                payload.color = float4(barycentricCoords, 1.0);
+                payload.radiance = 0.0;
+                payload.albedo = float4(barycentricCoords, 1.0);
                 payload.worldPosition = worldPosition;
-                payload.normal = faceNormal;
+                payload.worldNormal = faceNormal;
             }
 
             ENDHLSL

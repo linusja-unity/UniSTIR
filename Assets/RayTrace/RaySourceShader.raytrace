@@ -15,11 +15,15 @@ float g_Zoom; //Mathf.Tan(Mathf.Deg2Rad * Camera.main.fieldOfView * 0.5f)
 // Output
 RWTexture2D<float4> g_Output : register(u0);
 
-float4 SampleEnvironmentMap(float3 direction)
+float3 SampleEnvironmentMapColour(float3 direction)
 {
     float3 toLightDir = normalize(_WorldSpaceLightPos0.xyz);
-    float3 color = dot(direction, toLightDir) > 0.95 ? 1.0 : 0.0;
-    return float4(color, 1.0);
+    return dot(direction, toLightDir) > 0.999 ? 1.0 : 0.0;
+}
+
+float3 SampleEnvironmentMapRadience(float3 direction)
+{
+    return SampleEnvironmentMapColour(direction) * 10.0;
 }
 
 [shader("miss")]
@@ -29,8 +33,9 @@ void MainMissShader(inout RayPayload payload)
     float3 rayOriginW = WorldRayOrigin();
 
     payload.worldPosition = rayDirW * 1000.0f;
-    payload.color = SampleEnvironmentMap(rayDirW);
-    payload.normal = 0.0;
+    payload.albedo = SampleEnvironmentMapColour(rayDirW);
+    payload.radiance = SampleEnvironmentMapRadience(rayDirW);
+    payload.worldNormal = 0.0;
 }
 
 [shader("raygeneration")]
@@ -61,52 +66,71 @@ void MainRayGenShader()
     // Emperically decided for the scene
     float3 adjustedWorldPosition = worldPosition + worldNormal * 1e-2;
 
-    float3 accumulatedColor = g_Albedo[frameCoord];
+    float3 firstBounceRadiance = 0.0;
+    float3 firstBounceAlbedo = g_Albedo[frameCoord];
 
     // Todo: Replace with proper environment map
-    if (length(accumulatedColor.xyz) < 1e-6)
-        accumulatedColor = SampleEnvironmentMap(-toCameraDir);
+    if (length(firstBounceAlbedo.xyz) < 1e-6) {
+        firstBounceRadiance = SampleEnvironmentMapRadience(-toCameraDir);
+        firstBounceAlbedo = SampleEnvironmentMapColour(-toCameraDir);
+    }
+
+    float3 radiance = firstBounceRadiance;
+    float3 colour = 1.0f * firstBounceAlbedo; /* First founce colour */
 
     RayDesc ray;
-    RayPayload payload;
+    RayPayload reflectRayPayload;
+    RayPayload lightRayPayload;
     uint missShaderIndex = 0;
 
-    payload.worldPosition = adjustedWorldPosition;
-    payload.normal = worldNormal;
+    reflectRayPayload.worldPosition = adjustedWorldPosition;
+    reflectRayPayload.worldNormal = worldNormal;
+    float3 intersectIncidentVector = normalize(reflect(-toCameraDir, reflectRayPayload.worldNormal));
 
-    float3 incidentVector = normalize(reflect(-toCameraDir, payload.normal));
-    for (uint i = 0; i < 5 && length(payload.normal) > 1e-6; i++)
+    // If we hit the skybox, stop sampling
+    for (uint i = 0; i < 5 && length(reflectRayPayload.worldNormal) > 1e-6; i++)
     {
-        float3 bounceWorldPosition = payload.worldPosition;
-        float3 bounceWorldNormal = payload.normal;
+        float3 intersectWorldPosition = reflectRayPayload.worldPosition;
+        float3 intersectWorldNormal = reflectRayPayload.worldNormal;
 
-        ray.Origin    = bounceWorldPosition + bounceWorldNormal * 1e-4;
+        float weightShadow = max(dot(toLightDir, intersectWorldNormal), 0.0);
+        float weightReflect = max(dot(intersectIncidentVector, intersectWorldNormal), 0.0);
+        float weightSum = weightShadow + weightReflect;
+
+        // Always set the input data for the light ray and the reflection ray the same
+        lightRayPayload = reflectRayPayload;
+
+        ray.Origin    = intersectWorldPosition + intersectWorldNormal * 1e-4;
         ray.Direction = toLightDir;
         ray.TMin      = 0.0f;
         ray.TMax      = 1000.0f;
 
         // Shadow ray
-        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, lightRayPayload);
 
-        float weightShadow = max(dot(toLightDir, bounceWorldNormal), 1e-4);
-        float weightReflect = max(dot(incidentVector, bounceWorldNormal), 1e-4);
-        float weightSum = weightShadow + weightReflect;
+        radiance += colour * lightRayPayload.radiance * weightShadow / 10.0;
 
-        accumulatedColor += accumulatedColor * payload.color.xyz * weightShadow / weightSum;
-
-        ray.Origin    = bounceWorldPosition + incidentVector * 1e-4;
-        ray.Direction = incidentVector;
+        ray.Origin    = intersectWorldPosition + intersectIncidentVector * 1e-4;
+        ray.Direction = intersectIncidentVector;
         ray.TMin      = 0.0f;
         ray.TMax      = 1000.0f;
 
         // Reflection ray
-        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, payload);
+        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, ray, reflectRayPayload);
 
-        accumulatedColor += accumulatedColor * payload.color.xyz * weightReflect / weightSum;
+        float3 incomingLightReflect = reflectRayPayload.albedo * reflectRayPayload.radiance * weightReflect;
+        float3 incomingLightSkymap = lightRayPayload.albedo * lightRayPayload.radiance * weightShadow / 10.0;
+
+        radiance += colour * lerp(incomingLightReflect, incomingLightSkymap, 0.5);
+
+        colour *= reflectRayPayload.albedo;
+
+        if (length(colour) < 0.01)
+            break;
 
         // v_out = reflect(v_in, v_norm);
-        incidentVector = reflect(incidentVector, payload.normal);
+        intersectIncidentVector = reflect(intersectIncidentVector, reflectRayPayload.worldNormal);
     }
 
-    g_Output[frameCoord] = float4(accumulatedColor, 1.0);
+    g_Output[frameCoord] = float4(radiance, 1.0);
 }
