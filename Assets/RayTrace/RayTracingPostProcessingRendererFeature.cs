@@ -113,10 +113,10 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         cmd.BuildRayTracingAccelerationStructure(data.accelerationStructure);
 
         cmd.SetRayTracingAccelerationStructure(rayTracingShader, "g_SceneAccelStruct", data.accelerationStructure);
-        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Albedo", data.albedoTexture);
-        cmd.SetRayTracingTextureParam(rayTracingShader, "g_NormalSmoothness", data.normalSmoothnessTexture);
-        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Depths", data.depthsTexture);
-        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Motion", data.motionTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "_Albedo", data.albedoTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "_NormalSmoothness", data.normalSmoothnessTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "_Depths", data.depthsTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "_Motion", data.motionTexture);
         cmd.SetRayTracingFloatParam(rayTracingShader, "g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
         cmd.SetRayTracingIntParam(rayTracingShader, "g_ConvergenceStep", 0);
         cmd.SetRayTracingIntParam(rayTracingShader, "g_FrameIndex", Time.frameCount);

@@ -6,10 +6,12 @@
 
 // Input
 RaytracingAccelerationStructure g_SceneAccelStruct;
-Texture2D<float4> g_Albedo;
-Texture2D<float4> g_NormalSmoothness;
-Texture2D<float4> g_Depths;
-Texture2D<float4> g_Motion;
+Texture2D<float4> _Albedo;
+Texture2D<float4> _NormalSmoothness;
+Texture2D<float4> _Depths;
+Texture2D<float4> _Motion;
+
+SamplerState MyLinearClampSampler;
 
 float g_Zoom; //Mathf.Tan(Mathf.Deg2Rad * Camera.main.fieldOfView * 0.5f)
 uint g_ConvergenceStep;
@@ -50,11 +52,19 @@ void MainRayGenShader()
     uint xorBitValue = (launchIndex.x ^ launchIndex.y) & 0x000000FF;
     float normalizedXorValue = (float) xorBitValue / 255.0f;
 
-    float2 frameCoord = float2(launchIndex.x, launchDim.y - launchIndex.y - 1) + float2(0.5, 0.5);
+    uint rngState = uint(uint(launchIndex.x) * uint(1973) + uint(launchIndex.y) * uint(9277) + uint(g_ConvergenceStep + g_FrameIndex) * uint(26699)) | uint(1);
 
-    float2 uvCoords = frameCoord / float2(launchDim.x - 1, launchDim.y - 1);
-    float3 worldPosition = ComputeWorldSpacePosition(uvCoords, g_Depths[frameCoord].r, Inverse(UNITY_MATRIX_VP));
-    float3 worldNormal = normalize(g_NormalSmoothness[frameCoord].xyz);
+    float2 launchFrameCoord = float2(launchIndex.x, launchDim.y - launchIndex.y - 1) + float2(0.5, 0.5);
+
+    float2 subpixelOffset = float2(RandomFloat01(rngState), RandomFloat01(rngState));
+    float2 sampleFrameCoord = float2(launchIndex.x, launchDim.y - launchIndex.y - 1) + subpixelOffset;
+
+    float2 uvCoords = sampleFrameCoord / float2(launchDim.x - 1, launchDim.y - 1);
+
+    float4 albedoSample = _Albedo.SampleLevel(MyLinearClampSampler, uvCoords, 0);
+    float4 depthSample = _Depths.SampleLevel(MyLinearClampSampler, uvCoords, 0);
+    float4 normalDiffuseSample = _NormalSmoothness.SampleLevel(MyLinearClampSampler, uvCoords, 0);
+    float4 motionSample = _Motion.SampleLevel(MyLinearClampSampler, uvCoords, 0);
 
     float2 ndcCoords = uvCoords * 2 - float2(1, 1);
     ndcCoords = ndcCoords * g_Zoom;
@@ -62,18 +72,18 @@ void MainRayGenShader()
     float aspectRatio = (float)launchDim.x / (float)launchDim.y;
     float3 viewDirection = normalize(float3(ndcCoords.x * aspectRatio, ndcCoords.y, 1));
 
-    uint rngState = uint(uint(launchIndex.x) * uint(1973) + uint(launchIndex.y) * uint(9277) + uint(g_ConvergenceStep + g_FrameIndex) * uint(26699)) | uint(1);
-
     // Rotate the ray from view space to world space.
     float3 toCameraDir = -normalize(mul((float3x3)unity_CameraToWorld, viewDirection));
     float3 toLightDir = normalize(_WorldSpaceLightPos0.xyz);
 
-    // Emperically decided for the scene
-    float3 adjustedWorldPosition = worldPosition + worldNormal * 1e-2;
-
-    float firstBounceSmoothness = g_NormalSmoothness[frameCoord].w;
+    float3 firstBounceWorldPosition = ComputeWorldSpacePosition(uvCoords, depthSample.r, Inverse(UNITY_MATRIX_VP));
+    float3 firstBounceWorldNormal = normalize(normalDiffuseSample.xyz);
+    float firstBounceSmoothness = normalDiffuseSample.w;
     float3 firstBounceRadiance = 0.0;
-    float3 firstBounceAlbedo = g_Albedo[frameCoord];
+    float3 firstBounceAlbedo = albedoSample.xyz;
+
+    // Emperically decided for the scene
+    float3 adjustedWorldPosition = firstBounceWorldPosition + firstBounceWorldNormal * 1e-2;
 
     // Todo: Replace with proper environment map
     if (length(firstBounceAlbedo.xyz) < 1e-6) {
@@ -89,8 +99,8 @@ void MainRayGenShader()
     currPoint.albedo = 1.0f * firstBounceAlbedo;
     currPoint.radiance = firstBounceRadiance;
     currPoint.worldPosition = adjustedWorldPosition;
-    currPoint.worldNormal = worldNormal;
-    currPoint.worldReflection = RandomUnitVectorDirNormRange(rngState, firstBounceSmoothness, worldNormal);
+    currPoint.worldNormal = firstBounceWorldNormal;
+    currPoint.worldReflection = RandomUnitVectorDirNormRange(rngState, firstBounceSmoothness, currPoint.worldNormal);
 
     // Integration strategically happens in raygen shader
     float3 integratedRadiance = currPoint.radiance;
@@ -121,7 +131,6 @@ void MainRayGenShader()
         float probLightWeight = max(dot(toLightDir, currPoint.worldNormal), 0.0);
         float probPrimWeight = max(dot(currPoint.worldReflection, currPoint.worldNormal), 0.0);
 
-
         integratedRadiance += (integratedColour * currPoint.albedo) * lerp(lightRay.radiance * probLightWeight,
                                                                            primaryRay.radiance * probPrimWeight, 0.5);
 
@@ -134,5 +143,5 @@ void MainRayGenShader()
         currPoint = primaryRay;
     }
 
-    g_Output[frameCoord] = float4(integratedRadiance, 1.0);
+    g_Output[launchFrameCoord] = float4(integratedRadiance, 1.0);
 }
