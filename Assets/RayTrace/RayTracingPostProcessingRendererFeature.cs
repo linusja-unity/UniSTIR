@@ -7,6 +7,7 @@ using GraphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat;
 
 public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 {
+    [SerializeField] private Cubemap skybox;
     [SerializeField] private RayTracingShader rayTracingShader;
 
     [SerializeField] private Material defaultRayTracingMaterial;
@@ -19,7 +20,9 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
         {
             return;
         }
-        rayTracingRenderPass = new RayTracingPostProcessingRenderPass(rayTracingShader, defaultRayTracingMaterial);
+        rayTracingRenderPass = new RayTracingPostProcessingRenderPass(rayTracingShader,
+                                                                      defaultRayTracingMaterial,
+                                                                      skybox);
 
         rayTracingRenderPass.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
     }
@@ -49,6 +52,7 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 
 public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
 {
+    private Cubemap skybox;
     private RayTracingShader rayTracingShader;
 
     private RayTracingAccelerationStructure accelerationStructure;
@@ -61,8 +65,10 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
     private RTHandleSystem renderTexHandleSystem = new RTHandleSystem();
     private RTHandle renderTexHandle;
 
-    public RayTracingPostProcessingRenderPass(RayTracingShader rayTracingShader, Material defaultRayTracingMaterial)
+    public RayTracingPostProcessingRenderPass(RayTracingShader rayTracingShader,
+        Material defaultRayTracingMaterial, Cubemap skybox)
     {
+        this.skybox = skybox;
         this.rayTracingShader = rayTracingShader;
 
         rtasSettings = new RayTracingAccelerationStructure.Settings();

@@ -4,16 +4,21 @@
 
 #pragma max_recursion_depth 1
 
-// Input
+// Environment map
 RaytracingAccelerationStructure g_SceneAccelStruct;
+TextureCube<float4> g_EnvironmentMap;
+
+// First bounce data
 Texture2D<float4> _Albedo;
 Texture2D<float4> _NormalSmoothness;
 Texture2D<float4> _Depths;
 Texture2D<float4> _Motion;
-
 SamplerState MyLinearClampSampler;
 
+// Camera
 float g_Zoom; //Mathf.Tan(Mathf.Deg2Rad * Camera.main.fieldOfView * 0.5f)
+
+// Rnd state machine
 uint g_ConvergenceStep;
 uint g_FrameIndex;
 
