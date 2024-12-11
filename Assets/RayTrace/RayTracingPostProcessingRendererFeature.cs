@@ -95,7 +95,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         internal RayTracingAccelerationStructure accelerationStructure;
         internal RayTracingShader rayTracingShader;
         internal TextureHandle albedoTexture;
-        internal TextureHandle normalTexture;
+        internal TextureHandle normalSmoothnessTexture;
         internal TextureHandle depthsTexture;
         internal TextureHandle motionTexture;
 
@@ -114,7 +114,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
 
         cmd.SetRayTracingAccelerationStructure(rayTracingShader, "g_SceneAccelStruct", data.accelerationStructure);
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Albedo", data.albedoTexture);
-        cmd.SetRayTracingTextureParam(rayTracingShader, "g_Normal", data.normalTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "g_NormalSmoothness", data.normalSmoothnessTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Depths", data.depthsTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "g_Motion", data.motionTexture);
         cmd.SetRayTracingFloatParam(rayTracingShader, "g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
@@ -167,11 +167,11 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
             data.rayTracingShader = rayTracingShader;
             data.accelerationStructure = accelerationStructure;
             data.albedoTexture = resourceData.gBuffer[0];
-            data.normalTexture = resourceData.cameraNormalsTexture;
+            data.normalSmoothnessTexture = resourceData.cameraNormalsTexture;
             data.depthsTexture = resourceData.cameraDepthTexture;
             data.motionTexture = resourceData.motionVectorColor;
             builder.UseTexture(data.albedoTexture);
-            builder.UseTexture(data.normalTexture);
+            builder.UseTexture(data.normalSmoothnessTexture);
             builder.UseTexture(data.depthsTexture);
             builder.UseTexture(data.motionTexture);
 

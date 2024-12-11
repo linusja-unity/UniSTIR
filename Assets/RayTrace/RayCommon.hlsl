@@ -67,6 +67,11 @@ float3 RandomUnitVectorDir(inout uint state, in float max_angle, in float3 dir)
     return mul(zVector, zVectorToRotatedDir);
 }
 
+float3 RandomUnitVectorDirNormRange(inout uint state, in float normalized_range, in float3 dir)
+{
+    return RandomUnitVectorDir(state, lerp(K_PI, 0.0, normalized_range), dir);
+}
+
 float3 RandomUnitHemisphereVector(inout uint state, float3 dir)
 {
     return RandomUnitVectorDir(state, K_PI, dir);

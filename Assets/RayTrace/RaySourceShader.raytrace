@@ -7,9 +7,10 @@
 // Input
 RaytracingAccelerationStructure g_SceneAccelStruct;
 Texture2D<float4> g_Albedo;
-Texture2D<float4> g_Normal;
+Texture2D<float4> g_NormalSmoothness;
 Texture2D<float4> g_Depths;
 Texture2D<float4> g_Motion;
+
 float g_Zoom; //Mathf.Tan(Mathf.Deg2Rad * Camera.main.fieldOfView * 0.5f)
 uint g_ConvergenceStep;
 uint g_FrameIndex;
@@ -53,7 +54,7 @@ void MainRayGenShader()
 
     float2 uvCoords = frameCoord / float2(launchDim.x - 1, launchDim.y - 1);
     float3 worldPosition = ComputeWorldSpacePosition(uvCoords, g_Depths[frameCoord].r, Inverse(UNITY_MATRIX_VP));
-    float3 worldNormal = normalize(g_Normal[frameCoord].xyz);
+    float3 worldNormal = normalize(g_NormalSmoothness[frameCoord].xyz);
 
     float2 ndcCoords = uvCoords * 2 - float2(1, 1);
     ndcCoords = ndcCoords * g_Zoom;
@@ -70,6 +71,7 @@ void MainRayGenShader()
     // Emperically decided for the scene
     float3 adjustedWorldPosition = worldPosition + worldNormal * 1e-2;
 
+    float firstBounceSmoothness = g_NormalSmoothness[frameCoord].w;
     float3 firstBounceRadiance = 0.0;
     float3 firstBounceAlbedo = g_Albedo[frameCoord];
 
@@ -88,7 +90,7 @@ void MainRayGenShader()
     currPoint.radiance = firstBounceRadiance;
     currPoint.worldPosition = adjustedWorldPosition;
     currPoint.worldNormal = worldNormal;
-    currPoint.worldReflection = normalize(reflect(-toCameraDir, worldNormal));
+    currPoint.worldReflection = RandomUnitVectorDirNormRange(rngState, firstBounceSmoothness, worldNormal);
 
     // Integration strategically happens in raygen shader
     float3 integratedRadiance = currPoint.radiance;

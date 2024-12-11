@@ -540,6 +540,7 @@ Shader "URP-RayTray/Lit"
             #include "RayCommon.hlsl"
 
             float4 _BaseColor;
+            float _Smoothness;
 
             struct AttributeData
             {
@@ -605,7 +606,7 @@ Shader "URP-RayTray/Lit"
                 payload.albedo = _BaseColor;
                 payload.worldPosition = worldPosition;
                 payload.worldNormal = faceNormal;
-                payload.worldReflection = RandomUnitHemisphereVector(payload.rngState, faceNormal);
+                payload.worldReflection = RandomUnitVectorDirNormRange(payload.rngState, _Smoothness, faceNormal);
             }
 
             ENDHLSL
