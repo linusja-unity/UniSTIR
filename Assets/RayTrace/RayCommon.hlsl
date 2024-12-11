@@ -37,7 +37,7 @@ float3 RandomUnitVectorZ(inout uint state, in float max_angle)
      * the cone, and by always generating it for Z-axis, we can always rotate
      * to align it with a new direction.
      */
-    float z = 1.0 - 2.0 * max_angle / K_PI * RandomFloat01(state);
+    float z = 1.0 - (max_angle / K_PI) * RandomFloat01(state);
     float a = RandomFloat01(state) * K_TWO_PI;
     float r_slice = sqrt(1.0f - z * z);
     float x = r_slice * cos(a);
@@ -47,7 +47,7 @@ float3 RandomUnitVectorZ(inout uint state, in float max_angle)
 
 float3 RandomUnitVector(inout uint state)
 {
-    return RandomUnitVectorZ(state, K_PI);
+    return RandomUnitVectorZ(state, K_TWO_PI);
 }
 
 /* Generates a random vector in the UnitZ+ angle with max-angle offset in rad */
@@ -55,16 +55,21 @@ float3 RandomUnitVectorDir(inout uint state, in float max_angle, in float3 dir)
 {
     float3 zVector = RandomUnitVectorZ(state, max_angle);
     float3 generatedAngle = cross(dir, float3(0.0, 0.0, 1.0));
-    float3 baseX = cross(generatedAngle, dir);
-    float3 baseY = cross(baseX, dir);
 
-    float3x3 zVectorToRotatedDir = float3x3(baseX, baseY, dir);
-    return (dir.z > 0.99f) ? zVector : mul(zVectorToRotatedDir, zVector);
+    // If dir is effectivly the same as Z-axis, then we flip what we build our new base on
+    generatedAngle = (length(generatedAngle) < 1e-5) ? float3(0.0, 1.0, 0.0) : generatedAngle;
+
+    float3 baseX = normalize(cross(generatedAngle, dir));
+    float3 baseY = normalize(cross(baseX, dir));
+    float3 baseZ = normalize(dir);
+
+    float3x3 zVectorToRotatedDir = float3x3(baseX, baseY, baseZ);
+    return mul(zVector, zVectorToRotatedDir);
 }
 
 float3 RandomUnitHemisphereVector(inout uint state, float3 dir)
 {
-    return RandomUnitVectorDir(state, K_HALF_PI, dir);
+    return RandomUnitVectorDir(state, K_PI, dir);
 }
 
 struct RayPayload
