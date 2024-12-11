@@ -130,7 +130,7 @@ void MainRayGenShader()
 
             // Light ray
             newRayDesc.Origin    = currPoint.worldPosition + currPoint.worldNormal * 1e-4;
-            newRayDesc.Direction = toLightDir;
+            newRayDesc.Direction = RandomUnitVectorDirNormRange(currPoint.rngState, 0.99, toLightDir);
             TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, lightRay);
 
             // Primary ray
