@@ -56,92 +56,100 @@ void MainRayGenShader()
 
     float2 launchFrameCoord = float2(launchIndex.x, launchDim.y - launchIndex.y - 1) + float2(0.5, 0.5);
 
-    float2 subpixelOffset = float2(RandomFloat01(rngState), RandomFloat01(rngState));
-    float2 sampleFrameCoord = float2(launchIndex.x, launchDim.y - launchIndex.y - 1) + subpixelOffset;
+    uint samples = 1;
 
-    float2 uvCoords = sampleFrameCoord / float2(launchDim.x - 1, launchDim.y - 1);
-
-    float4 albedoSample = _Albedo.SampleLevel(MyLinearClampSampler, uvCoords, 0);
-    float4 depthSample = _Depths.SampleLevel(MyLinearClampSampler, uvCoords, 0);
-    float4 normalDiffuseSample = _NormalSmoothness.SampleLevel(MyLinearClampSampler, uvCoords, 0);
-    float4 motionSample = _Motion.SampleLevel(MyLinearClampSampler, uvCoords, 0);
-
-    float2 ndcCoords = uvCoords * 2 - float2(1, 1);
-    ndcCoords = ndcCoords * g_Zoom;
-
-    float aspectRatio = (float)launchDim.x / (float)launchDim.y;
-    float3 viewDirection = normalize(float3(ndcCoords.x * aspectRatio, ndcCoords.y, 1));
-
-    // Rotate the ray from view space to world space.
-    float3 toCameraDir = -normalize(mul((float3x3)unity_CameraToWorld, viewDirection));
-    float3 toLightDir = normalize(_WorldSpaceLightPos0.xyz);
-
-    float3 firstBounceWorldPosition = ComputeWorldSpacePosition(uvCoords, depthSample.r, Inverse(UNITY_MATRIX_VP));
-    float3 firstBounceWorldNormal = normalize(normalDiffuseSample.xyz);
-    float firstBounceSmoothness = normalDiffuseSample.w;
-    float3 firstBounceRadiance = 0.0;
-    float3 firstBounceAlbedo = albedoSample.xyz;
-
-    // Emperically decided for the scene
-    float3 adjustedWorldPosition = firstBounceWorldPosition + firstBounceWorldNormal * 1e-2;
-
-    // Todo: Replace with proper environment map
-    if (length(firstBounceAlbedo.xyz) < 1e-6) {
-        firstBounceRadiance = SampleEnvironmentMapRadience(-toCameraDir);
-        firstBounceAlbedo = SampleEnvironmentMapColour(-toCameraDir);
-    }
-
-    uint missShaderIndex = 0;
-
-    // Describ the condition of the first bounce data by sampling rasterisation gbuffer
-    RayPayload currPoint;
-    currPoint.rngState = rngState;
-    currPoint.albedo = 1.0f * firstBounceAlbedo;
-    currPoint.radiance = firstBounceRadiance;
-    currPoint.worldPosition = adjustedWorldPosition;
-    currPoint.worldNormal = firstBounceWorldNormal;
-    currPoint.worldReflection = RandomUnitVectorDirNormRange(rngState, firstBounceSmoothness, currPoint.worldNormal);
-
-    // Integration strategically happens in raygen shader
-    float3 integratedRadiance = currPoint.radiance;
-    float3 integratedColour = 1;
-
-    // If we hit the skybox, stop sampling
-    for (uint i = 0; i < 5 && length(currPoint.worldNormal) > 1e-6; i++)
+    float3 averageOutput = 0.0;
+    for (uint s = 0; s < samples; s++)
     {
-        RayDesc newRayDesc;
-        newRayDesc.TMin      = 0.0f;
-        newRayDesc.TMax      = 1000.0f;
+        float2 subpixelOffset = float2(RandomFloat01(rngState), RandomFloat01(rngState)) - 0.5;
+        float2 sampleFrameCoord = launchFrameCoord + subpixelOffset;
 
-        RayPayload primaryRay, lightRay;
+        float2 uvCoords = sampleFrameCoord / float2(launchDim.x - 1, launchDim.y - 1);
 
-        // Always set the input data be the previous rays output data
-        primaryRay = lightRay = currPoint;
+        float4 albedoSample = _Albedo.SampleLevel(MyLinearClampSampler, uvCoords, 0);
+        float4 depthSample = _Depths.SampleLevel(MyLinearClampSampler, uvCoords, 0);
+        float4 normalDiffuseSample = _NormalSmoothness.SampleLevel(MyLinearClampSampler, uvCoords, 0);
+        float4 motionSample = _Motion.SampleLevel(MyLinearClampSampler, uvCoords, 0);
 
-        // Light ray
-        newRayDesc.Origin    = currPoint.worldPosition + currPoint.worldNormal * 1e-4;
-        newRayDesc.Direction = toLightDir;
-        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, lightRay);
+        float2 ndcCoords = uvCoords * 2 - float2(1, 1);
+        ndcCoords = ndcCoords * g_Zoom;
 
-        // Primary ray
-        newRayDesc.Origin    = currPoint.worldPosition + currPoint.worldNormal * 1e-4;
-        newRayDesc.Direction = currPoint.worldReflection;
-        TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, primaryRay);
+        float aspectRatio = (float)launchDim.x / (float)launchDim.y;
+        float3 viewDirection = normalize(float3(ndcCoords.x * aspectRatio, ndcCoords.y, 1));
 
-        float probLightWeight = max(dot(toLightDir, currPoint.worldNormal), 0.0);
-        float probPrimWeight = max(dot(currPoint.worldReflection, currPoint.worldNormal), 0.0);
+        // Rotate the ray from view space to world space.
+        float3 toCameraDir = -normalize(mul((float3x3)unity_CameraToWorld, viewDirection));
+        float3 toLightDir = normalize(_WorldSpaceLightPos0.xyz);
 
-        integratedRadiance += (integratedColour * currPoint.albedo) * lerp(lightRay.radiance * probLightWeight,
-                                                                           primaryRay.radiance * probPrimWeight, 0.5);
+        float3 firstBounceWorldPosition = ComputeWorldSpacePosition(uvCoords, depthSample.r, Inverse(UNITY_MATRIX_VP));
+        float3 firstBounceWorldNormal = normalize(normalDiffuseSample.xyz);
+        float firstBounceSmoothness = normalDiffuseSample.w;
+        float3 firstBounceRadiance = 0.0;
+        float3 firstBounceAlbedo = albedoSample.xyz;
 
-        // If we reflect into void or if accumulate bounces are miniscule
-        if (length(integratedColour) < 1e-6 || length(primaryRay.worldReflection) < 1e-6)
-            break;
+        // Emperically decided for the scene
+        float3 adjustedWorldPosition = firstBounceWorldPosition + firstBounceWorldNormal * 1e-2;
 
-        // Since we continue to bounce, follow the primary ray
-        integratedColour *= primaryRay.albedo;
-        currPoint = primaryRay;
+        // Todo: Replace with proper environment map
+        if (length(firstBounceAlbedo.xyz) < 1e-6) {
+            firstBounceRadiance = SampleEnvironmentMapRadience(-toCameraDir);
+            firstBounceAlbedo = SampleEnvironmentMapColour(-toCameraDir);
+        }
+
+        uint missShaderIndex = 0;
+
+        // Describ the condition of the first bounce data by sampling rasterisation gbuffer
+        RayPayload currPoint;
+        currPoint.rngState = rngState;
+        currPoint.albedo = 1.0f * firstBounceAlbedo;
+        currPoint.radiance = firstBounceRadiance;
+        currPoint.worldPosition = adjustedWorldPosition;
+        currPoint.worldNormal = firstBounceWorldNormal;
+        currPoint.worldReflection = RandomUnitVectorDirNormRange(rngState, firstBounceSmoothness, currPoint.worldNormal);
+
+        // Integration strategically happens in raygen shader
+        float3 integratedRadiance = currPoint.radiance;
+        float3 integratedColour = 1;
+
+        // If we hit the skybox, stop sampling
+        for (uint i = 0; i < 5 && length(currPoint.worldNormal) > 1e-6; i++)
+        {
+            RayDesc newRayDesc;
+            newRayDesc.TMin      = 0.0f;
+            newRayDesc.TMax      = 1000.0f;
+
+            RayPayload primaryRay, lightRay;
+
+            // Always set the input data be the previous rays output data
+            primaryRay = lightRay = currPoint;
+
+            // Light ray
+            newRayDesc.Origin    = currPoint.worldPosition + currPoint.worldNormal * 1e-4;
+            newRayDesc.Direction = toLightDir;
+            TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, lightRay);
+
+            // Primary ray
+            newRayDesc.Origin    = currPoint.worldPosition + currPoint.worldNormal * 1e-4;
+            newRayDesc.Direction = currPoint.worldReflection;
+            TraceRay(g_SceneAccelStruct, 0, 0xFF, 0, 1, missShaderIndex, newRayDesc, primaryRay);
+
+            float probLightWeight = max(dot(toLightDir, currPoint.worldNormal), 0.0);
+            float probPrimWeight = max(dot(currPoint.worldReflection, currPoint.worldNormal), 0.0);
+
+            integratedRadiance += (integratedColour * currPoint.albedo) * lerp(lightRay.radiance * probLightWeight,
+                                                                            primaryRay.radiance * probPrimWeight, 0.5);
+
+            // If we reflect into void or if accumulate bounces are miniscule
+            if (length(integratedColour) < 1e-6 || length(primaryRay.worldReflection) < 1e-6)
+                break;
+
+            // Since we continue to bounce, follow the primary ray
+            integratedColour *= primaryRay.albedo;
+            currPoint = primaryRay;
+        }
+
+        averageOutput += integratedRadiance / float(samples);
     }
 
-    g_Output[launchFrameCoord] = float4(integratedRadiance, 1.0);
+    g_Output[launchFrameCoord] = float4(averageOutput, 1.0);
 }
