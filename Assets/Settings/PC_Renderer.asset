@@ -65,5 +65,6 @@ MonoBehaviour:
   m_Name: RayTracingPostProcessingRendererFeature
   m_EditorClassIdentifier: 
   m_Active: 1
+  skybox: {fileID: 8900000, guid: 73c65f9d4cc7b6c49a9220fb0f07a651, type: 3}
   rayTracingShader: {fileID: 4807578003741378534, guid: 43ab323ef1e48cf44b6d2f9c9dca1ab6, type: 3}
   defaultRayTracingMaterial: {fileID: 2100000, guid: 4ecda3785baed3f4681435032978f32e, type: 2}

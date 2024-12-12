@@ -43,6 +43,7 @@ Material:
     - _Glossiness: 0.5
     - _GlossyReflections: 1
     - _Parallax: 0.02
+    - _Smoothness: 0.995
     m_Colors:
     - _BaseColor: {r: 0.25516194, g: 0.5779254, b: 0.8867924, a: 1}
     - _Color: {r: 0.2551619, g: 0.5779253, b: 0.8867924, a: 1}
