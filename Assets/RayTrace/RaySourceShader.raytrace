@@ -6,7 +6,8 @@
 
 // Environment map
 RaytracingAccelerationStructure g_SceneAccelStruct;
-TextureCube<float4> g_EnvironmentMap;
+TextureCube<float4> g_EnvTex;
+SamplerState sampler_g_EnvTex;
 
 // First bounce data
 Texture2D<float4> _Albedo;
@@ -28,7 +29,7 @@ RWTexture2D<float4> g_Output : register(u0);
 float3 SampleEnvironmentMapColour(float3 direction)
 {
     float3 toLightDir = normalize(_WorldSpaceLightPos0.xyz);
-    return dot(direction, toLightDir) > 0.999 ? 1.0 : float3(0.5, 0.8, 0.9);
+    return dot(direction, toLightDir) > 0.999 ? 1.0 : g_EnvTex.SampleLevel(sampler_g_EnvTex, direction, 0);
 }
 
 float3 SampleEnvironmentMapRadience(float3 direction)

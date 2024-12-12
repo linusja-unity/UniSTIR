@@ -8,6 +8,7 @@ using GraphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat;
 public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 {
     [SerializeField] private Cubemap skybox;
+
     [SerializeField] private RayTracingShader rayTracingShader;
 
     [SerializeField] private Material defaultRayTracingMaterial;
@@ -16,7 +17,7 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 
     public override void Create()
     {
-        if (rayTracingShader == null || defaultRayTracingMaterial == null)
+        if (rayTracingShader == null || defaultRayTracingMaterial == null || skybox == null)
         {
             return;
         }
@@ -52,7 +53,7 @@ public class RayTracingPostProcessingRendererFeature : ScriptableRendererFeature
 
 public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
 {
-    private Cubemap skybox;
+    private RTHandle cubemapRTHandle;
     private RayTracingShader rayTracingShader;
 
     private RayTracingAccelerationStructure accelerationStructure;
@@ -68,8 +69,8 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
     public RayTracingPostProcessingRenderPass(RayTracingShader rayTracingShader,
         Material defaultRayTracingMaterial, Cubemap skybox)
     {
-        this.skybox = skybox;
         this.rayTracingShader = rayTracingShader;
+        cubemapRTHandle = RTHandles.Alloc(skybox);
 
         rtasSettings = new RayTracingAccelerationStructure.Settings();
         rtasSettings.managementMode = RayTracingAccelerationStructure.ManagementMode.Manual;
@@ -104,7 +105,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         internal TextureHandle normalSmoothnessTexture;
         internal TextureHandle depthsTexture;
         internal TextureHandle motionTexture;
-
+        internal TextureHandle cubemapRTHandle;
         // Output
         internal TextureHandle outputBuffer;
     }
@@ -118,11 +119,14 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         rayTracingShader.SetShaderPass("RayTracingPass");
         cmd.BuildRayTracingAccelerationStructure(data.accelerationStructure);
 
+        cmd.SetRayTracingTextureParam(rayTracingShader, "g_EnvTex", data.cubemapRTHandle);
         cmd.SetRayTracingAccelerationStructure(rayTracingShader, "g_SceneAccelStruct", data.accelerationStructure);
+
         cmd.SetRayTracingTextureParam(rayTracingShader, "_Albedo", data.albedoTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "_NormalSmoothness", data.normalSmoothnessTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "_Depths", data.depthsTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "_Motion", data.motionTexture);
+
         cmd.SetRayTracingFloatParam(rayTracingShader, "g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
         cmd.SetRayTracingIntParam(rayTracingShader, "g_ConvergenceStep", 0);
         cmd.SetRayTracingIntParam(rayTracingShader, "g_FrameIndex", Time.frameCount);
@@ -166,6 +170,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         desc.msaaSamples = 1;
         desc.depthBufferBits = 0;
 
+        TextureHandle cubemapTexHandle = renderGraph.ImportTexture(cubemapRTHandle);
         TextureHandle output = renderGraph.ImportTexture(renderTexHandle);
         using (var builder = renderGraph.AddComputePass(passName, out PassData data))
         {
@@ -176,10 +181,12 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
             data.normalSmoothnessTexture = resourceData.cameraNormalsTexture;
             data.depthsTexture = resourceData.cameraDepthTexture;
             data.motionTexture = resourceData.motionVectorColor;
+            data.cubemapRTHandle = cubemapTexHandle;
             builder.UseTexture(data.albedoTexture);
             builder.UseTexture(data.normalSmoothnessTexture);
             builder.UseTexture(data.depthsTexture);
             builder.UseTexture(data.motionTexture);
+            builder.UseTexture(data.cubemapRTHandle);
 
             data.outputBuffer = output;
             builder.UseTexture(data.outputBuffer, AccessFlags.ReadWrite);
