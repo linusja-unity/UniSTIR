@@ -14,6 +14,7 @@ Texture2D<float4> _Albedo;
 Texture2D<float4> _NormalSmoothness;
 Texture2D<float4> _Depths;
 Texture2D<float4> _Motion;
+Texture2D<float4> _Emissive;
 SamplerState MyLinearClampSampler;
 
 // Camera
@@ -61,6 +62,7 @@ void MainRayGenShader()
     uint rngState = uint(uint(launchIndex.x) * uint(1973) + uint(launchIndex.y) * uint(9277) + uint(g_ConvergenceStep + g_FrameIndex) * uint(26699)) | uint(1);
 
     float2 launchFrameCoord = float2(launchIndex.x, launchDim.y - launchIndex.y - 1) + float2(0.5, 0.5);
+    float2 uvCoords2 = launchFrameCoord / float2(launchDim.x - 1, launchDim.y - 1);
 
     uint samples = 1;
 
@@ -155,4 +157,7 @@ void MainRayGenShader()
     }
 
     g_Output[launchFrameCoord] = float4(averageOutput, 1.0);
+
+    if (uvCoords2.x < 0.5)
+        g_Output[launchFrameCoord] = _Emissive[launchFrameCoord];
 }

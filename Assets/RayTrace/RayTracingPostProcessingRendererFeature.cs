@@ -105,6 +105,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         internal TextureHandle normalSmoothnessTexture;
         internal TextureHandle depthsTexture;
         internal TextureHandle motionTexture;
+        internal TextureHandle emissiveTexture;
         internal TextureHandle cubemapRTHandle;
         // Output
         internal TextureHandle outputBuffer;
@@ -126,6 +127,7 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
         cmd.SetRayTracingTextureParam(rayTracingShader, "_NormalSmoothness", data.normalSmoothnessTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "_Depths", data.depthsTexture);
         cmd.SetRayTracingTextureParam(rayTracingShader, "_Motion", data.motionTexture);
+        cmd.SetRayTracingTextureParam(rayTracingShader, "_Emissive", data.emissiveTexture);
 
         cmd.SetRayTracingFloatParam(rayTracingShader, "g_Zoom", Mathf.Tan(Mathf.Deg2Rad * c.fieldOfView * 0.5f));
         cmd.SetRayTracingIntParam(rayTracingShader, "g_ConvergenceStep", 0);
@@ -181,11 +183,13 @@ public class RayTracingPostProcessingRenderPass : ScriptableRenderPass
             data.normalSmoothnessTexture = resourceData.cameraNormalsTexture;
             data.depthsTexture = resourceData.cameraDepthTexture;
             data.motionTexture = resourceData.motionVectorColor;
+            data.emissiveTexture = resourceData.gBuffer[3];
             data.cubemapRTHandle = cubemapTexHandle;
             builder.UseTexture(data.albedoTexture);
             builder.UseTexture(data.normalSmoothnessTexture);
             builder.UseTexture(data.depthsTexture);
             builder.UseTexture(data.motionTexture);
+            builder.UseTexture(data.emissiveTexture);
             builder.UseTexture(data.cubemapRTHandle);
 
             data.outputBuffer = output;
