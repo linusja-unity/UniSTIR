@@ -539,6 +539,7 @@ Shader "URP-RayTray/Lit"
             #include "UnityRaytracingMeshUtils.cginc"
             #include "RayCommon.hlsl"
 
+            float3 _EmissionColor;
             float4 _BaseColor;
             float _Smoothness;
 
@@ -602,7 +603,7 @@ Shader "URP-RayTray/Lit"
                 float3 worldPosition = mul(ObjectToWorld(), float4(v.position, 1));
                 float3 faceNormal = normalize(mul(v.normal, (float3x3)WorldToObject()));
 
-                payload.radiance = 0.0;
+                payload.radiance = _EmissionColor;
                 payload.albedo = _BaseColor;
                 payload.worldPosition = worldPosition;
                 payload.worldNormal = faceNormal;
